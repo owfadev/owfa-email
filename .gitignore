@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+# mailbox connector state never lives in a repository; gcp.json is the human-provided
+# GCP OAuth client and must stay local-only (the connector keeps it in $OWFA_HOME)
+gcp.json

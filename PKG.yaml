@@ -1,7 +1,7 @@
 schema_version: 1
 id: email
-version: 0.2
-compat: ">= 0.2"
+version: 0.3
+compat: ">= 0.5.2"
 members: [email]
 connectors:
   - name: mail-cli
@@ -9,9 +9,9 @@ connectors:
 depends: [framework]
 uninstall:
   retains: [wiki/email/]
-  credentials: ["mail-cli 凭据与会话缓存（本机，不入库）"]
+  credentials: ["mail-cli 凭据/令牌/策略 + gcp.json（本机 $OWFA_HOME/connectors/mail-cli/homes/<id>/，红线：不入库；legacy ~/.config/mail-cli 由 `mail-cli home migrate` 显式迁移）"]
   bridges: []
   processes: []
-disclosure: "Reads personal mailboxes via mail-cli (Graph/IMAP); processes email contents, headers and attachments (privacy: high); credentials only on this machine; mailbox is read-only (PEEK, never marking/moving/deleting); mailbox data never enters any git repository."
+disclosure: "Reads personal mailboxes via mail-cli (Graph/IMAP); processes email contents, headers and attachments (privacy: high); credentials only on this machine (machine-substrate home $OWFA_HOME/connectors/mail-cli/, never in any repo; gcp.json is the human-provided OAuth client and stays local-only); mailbox is read-only (PEEK, never marking/moving/deleting); mailbox data never enters any git repository."
 menu:
   email: mailbox domain — digest inbox, people archives, threads (read-only, PEEK)
