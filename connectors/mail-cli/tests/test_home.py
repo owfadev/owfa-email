@@ -10,6 +10,7 @@ a machine that only has the connector.
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -41,6 +42,15 @@ class HomeTestCase(unittest.TestCase):
         self.substrate = self.owfa_home / "connectors" / "mail-cli" / "homes" / "default"
 
     # -- fixtures -----------------------------------------------------
+
+    def make_workspace(self) -> Path:
+        """A disposable workspace carrying the connector tree and a planted helper."""
+        ws = Path(self._tmp.name) / "ws"
+        shutil.copytree(PKG_DIR, ws / "connectors" / "mail-cli",
+                        ignore=shutil.ignore_patterns("__pycache__"))
+        (ws / ".owfa" / "scripts").mkdir(parents=True)
+        shutil.copyfile(HELPER, ws / ".owfa" / "scripts" / "owfa_home.py")
+        return ws
 
     def make_legacy(self) -> Path:
         self.legacy.mkdir(parents=True)
@@ -89,6 +99,23 @@ class ResolutionTests(HomeTestCase):
         self.assertNotIn("legacy home", proc.stderr)          # canonical path is quiet
         self.assertFalse(self.legacy.exists())                # nothing created in the old home
         self.assertFalse(self.substrate.exists())             # resolution creates nothing either
+
+    @needs_helper
+    def test_walk_up_finds_the_planted_workspace_helper(self):
+        """The primary ABI path: no OWFA_HOME_HELPER, helper planted in the workspace tree."""
+        ws = self.make_workspace()
+        neutral = Path(self._tmp.name) / "neutral"
+        neutral.mkdir()
+        proc = subprocess.run(
+            [sys.executable, str(ws / "connectors" / "mail-cli" / "mail-cli"), "home", "status"],
+            cwd=str(neutral), env=self.env(OWFA_HOME=self.owfa_home),
+            capture_output=True, text=True, timeout=60)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        out = self.payload(proc)
+        self.assertEqual(out["source"], "substrate")
+        self.assertEqual(Path(out["state_dir"]), self.substrate)
+        self.assertEqual(Path(out["helper"]), ws / ".owfa" / "scripts" / "owfa_home.py")
+        self.assertNotIn("not found", proc.stderr)
 
     @needs_helper
     def test_env_override_wins_over_substrate_and_legacy(self):
