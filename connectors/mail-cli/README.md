@@ -1,12 +1,44 @@
 # mail-cli
 
-Connector for the wiki email domain (multi-provider: Microsoft Graph / Gmail API / IMAP), OAuth2 device flow or authorization-code login. Contract: `.meta/plugins/email/`.
+Connector for the wiki email domain (multi-provider: Microsoft Graph / Gmail API / IMAP), OAuth2 device flow or authorization-code login. Contract: `.owfa/plugins/domains/email/`.
 
 ## Discipline
 
 - Read side is read-only: fetching never implicitly marks messages as read (Graph GET / IMAP `BODY.PEEK`), never moves, archives, or deletes
-- Credentials stay on the local machine in `~/.config/mail-cli/` (0600), never enter any repo; the GCP OAuth client likewise stays local only, in `gcp.json`
+- Credentials, tokens and the send policy stay on the local machine in the connector state dir (0600) — `$OWFA_HOME/connectors/mail-cli/homes/<id>/`, `mail-cli home status` — and never enter any repo; the human-provided GCP OAuth client `gcp.json` lives in that same directory, moves with it, and stays local-only (never in any repo, never copied by the tooling)
 - Send policy gate (see below): send-type operations are governed at the connector layer by a manually configured policy
+
+## State and migration (machine substrate)
+
+No state lives in a repository. OAuth tokens (one `<account>.json` per profile), the send
+policy (`policy.json`) and the human-provided GCP OAuth client (`gcp.json`) live in the
+**connector state dir**, resolved at run time through the machine helper
+`.owfa/scripts/owfa_home.py` (ABI: `.owfa/docs/home.md`) rather than assembled by hand:
+
+```
+$OWFA_HOME/connectors/mail-cli/homes/<id>/        # default: $OWFA_HOME=~/.owfa, <id>=default
+```
+
+Resolution order:
+
+1. `MAIL_CLI_HOME` — explicit override: use exactly this directory (compatibility escape hatch)
+2. the substrate helper — `resolve_home("mail-cli")`, the canonical default
+3. the pre-0.4 scattered home `~/.config/mail-cli` — only when no helper/workspace is found,
+   or when the substrate home does not exist yet and the old directory still holds state.
+   This fallback is **loud**: one stderr line names the migration command, and no second
+   home is created silently.
+
+```
+mail-cli home status                  # read-only: source, state_dir, legacy presence, bindings + hazards
+mail-cli home migrate --dry-run       # show the planned move (entries, from -> to); changes nothing
+mail-cli home migrate                 # move ~/.config/mail-cli into the substrate, bind this root, leave a symlink
+```
+
+`home migrate` moves, never copies (credentials must exist once), carries `gcp.json` with the
+directory as-is, leaves a symlink at the legacy path so old absolute references keep
+resolving, and refuses when `MAIL_CLI_HOME` is set, when the legacy directory is absent, or
+when the target home already holds state. The move is the machine owner's cutover — never
+run it on a machine you do not own.
 
 ## Usage
 
@@ -17,6 +49,7 @@ mail-cli auth start  --account <name> [--provider graph|gmail] [--send]  # devic
 mail-cli auth setup  --account <name> --user <address> --auth-code <code> [--imap-host H] [--smtp-host H]  # imap (e.g. 163)
 mail-cli auth status --account <name>
 mail-cli profiles                                 # account list (digest-page traversal entry)
+mail-cli home [status|migrate] [--dry-run]        # connector state dir + the explicit legacy migration
 mail-cli folders --account <name> [--all]           # folders/labels (imap auto-decodes Chinese UTF-7 folder names)
 mail-cli fetch --account <name> [--folder F] [--since D | --days 7] [--from A]
                 [--unread] [--headers] [--limit 30] [--next <url>]
@@ -34,7 +67,7 @@ Output is always single-line JSON. graph/gmail tokens auto-renew on expiry.
 
 ## Send policy (manually configured; the connector only reads it)
 
-`~/.config/mail-cli/policy.json`, hand-edited by a human, **absent = deny everything**:
+`policy.json` in the connector state dir (`mail-cli home status`), hand-edited by a human, **absent = deny everything**:
 
 ```json
 {"<account>": {"send": "deny|confirm|auto", "auto_allow": ["whitelisted addresses"]}}
@@ -58,6 +91,7 @@ None (Python 3 standard library). graph borrows the public Microsoft Graph Power
 
 ## Changelog
 
+- 0.5 2026-11-22: connector-home substrate — tokens/policy/GCP client resolve through the machine helper `.owfa/scripts/owfa_home.py` into `$OWFA_HOME/connectors/mail-cli/homes/<id>/` instead of the scattered `~/.config/mail-cli`; new `home status` + `home migrate [--dry-run]` (explicit, move-never-copy, binds the root, leaves the legacy symlink); `MAIL_CLI_HOME` explicit override; the legacy home stays a loud fallback with a stderr migration notice; gcp.json keeps riding along and stays local-only; 18 new tests run the CLI against temp HOME/OWFA_HOME (the real mailbox state is never touched)
 - 0.4 2026-10-05: graph least privilege — default scope narrowed to `Mail.Read offline_access` (reading mail no longer triggers the write/send consent surface and the admin approval that follows), `auth start --send` explicitly requests the broad scope; token records the granted scope (refresh preserves the surface), draft create/delete and send are rejected early under read-only credentials (token_read_only)
 - 0.3 2026-10-05: multi-provider (graph/gmail/imap); send policy gate policy.json (deny/confirm/auto + whitelist); full draft suite and send (graph createReply / gmail threadId / imap In-Reply-To thread headers); 163 IMAP ID and UTF-7 folder decoding; gmail loopback auth flow
 - 0.2 2026-10-05: multi-account command surface — `--account` aligned with the plugin contract (was `--profile`); added profiles / folders / attach ls·get; fetch gained `--folder/--since/--from/--unread/--headers` and pagination; read gained `--text` plain-text extraction and message-id/references; errors became JSON output

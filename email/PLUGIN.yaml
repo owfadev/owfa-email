@@ -1,12 +1,12 @@
 id: email
-version: 0.5
+version: 0.6
 depends:
   - domain
   - wiki
   - trust
   - log
   - cron
-updated: 2026-10-06
+updated: 2026-11-22
 attachment:
   - "wiki/email/ — personal mailbox domain territory (domain root: the unified digest and global person archives; one directory per account, directory name = connector profile name)"
   - "wiki/email/inbox.md — unified inbox digest (cross-account distillation, lines tagged with the account, whole page regenerable, short TTL)"

@@ -32,6 +32,7 @@
 
 ## Changelog
 
+- 0.6 (2026-11-22) connector-home substrate — mail-cli state (tokens, policy, Gmail's human-provided gcp.json) resolves through `.owfa/scripts/owfa_home.py` into `$OWFA_HOME/connectors/mail-cli/homes/<id>/` instead of the scattered `~/.config/mail-cli`, with explicit `home status` / `home migrate [--dry-run]` and `MAIL_CLI_HOME` as the override; no semantic change to the providers, the read-only discipline or the send policy (connector 0.5)
 - 0.5 (2026-10-06) inject line compressed to pointer density (issue #12 layer discipline) (family roster duty added) — procedural detail lives in usage / PLUGIN.md / skills- 0.4 2026-10-06: attach the cron bridge — the optional daily-refresh disclosure reworded to task-page registration (form: session), depends adds cron
 - 0.3 2026-10-02: global-domain batch two — derivation sentences gain bridge pointers
 - 0.2 2026-10-02: global-domain batch one — attach the mandatory log bridge edge; constitution principle 11, kernel verifies completeness

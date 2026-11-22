@@ -1,6 +1,6 @@
 """CLI: argument parsing and provider dispatch."""
 import argparse, json, os, sys
-from . import graph, gmail, imapc
+from . import graph, gmail, imapc, home
 from .common import (out, fail, cfg_dir, cfg_path, load_tok, save_tok,
                      refresh, P, send_policy)
 
@@ -26,6 +26,17 @@ def cmd_auth(args):
         tok = load_tok(args.account)
         out({"ok": bool(tok), "provider": (tok or {}).get("provider", "graph"),
              "account": (tok or {}).get("account")})
+
+def cmd_home(args):
+    """Connector state location + the explicit pre-0.4 migration (never a side effect)."""
+    if args.action == "migrate":
+        try:
+            out(home.migrate(dry_run=args.dry_run, root=args.root))
+        except home.MigrationError as e:
+            print(json.dumps({"ok": False, "error": str(e)}, ensure_ascii=False))
+            raise SystemExit(1)
+        return
+    out(home.status())
 
 def cmd_profiles(_):
     accs = []
@@ -100,6 +111,14 @@ def main():
 
     sp.add_parser("profiles")
 
+    h = sp.add_parser("home", help="machine substrate: where state lives, and the explicit legacy migration")
+    h.add_argument("action", nargs="?", choices=["status", "migrate"], default="status",
+                   help="status = read-only view (default); migrate = move ~/.config/mail-cli into the substrate")
+    h.add_argument("--dry-run", action="store_true",
+                   help="migrate: print the planned move and change nothing")
+    h.add_argument("--root", default="",
+                   help="migrate: workspace root to bind (default: current directory)")
+
     f = sp.add_parser("folders"); f.add_argument("--account", required=True); f.add_argument("--all", action="store_true")
 
     f = sp.add_parser("fetch"); f.add_argument("--account", required=True)
@@ -137,6 +156,6 @@ def main():
     s.add_argument("--id", required=True); s.add_argument("--yes", action="store_true")
 
     args = ap.parse_args()
-    {"auth": cmd_auth, "profiles": cmd_profiles, "folders": cmd_folders,
+    {"auth": cmd_auth, "profiles": cmd_profiles, "home": cmd_home, "folders": cmd_folders,
      "fetch": cmd_fetch, "read": cmd_read, "search": cmd_search, "attach": cmd_attach,
      "draft": cmd_draft, "send": cmd_send}[args.cmd](args)

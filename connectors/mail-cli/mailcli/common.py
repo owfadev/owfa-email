@@ -1,16 +1,25 @@
 """Common layer: config/credentials/HTTP/policy/token renewal/view utilities."""
 import email, email.policy, json, mimetypes, os, re, sys, time
 import urllib.request, urllib.parse, urllib.error
+from . import home
 
 GRAPH = "https://graph.microsoft.com/v1.0"
 GMAIL = "https://gmail.googleapis.com/gmail/v1/users/me"
 GMAIL_SCOPE = "https://mail.google.com/"  # full access — gmail accounts require explicit user delegation
 
 # ---------- config & credentials (local machine only, never in any repo) ----------
+#
+# The state dir is resolved at run time through the machine substrate helper
+# (mailcli/home.py -> .owfa/scripts/owfa_home.py, docs/home.md):
+#   $OWFA_HOME/connectors/mail-cli/homes/<id>/   (default $OWFA_HOME=~/.owfa)
+# MAIL_CLI_HOME overrides it outright; the pre-0.4 ~/.config/mail-cli survives only as a
+# loud fallback and is moved by the explicit `mail-cli home migrate`. gcp.json (the
+# human-provided GCP OAuth client) lives in this directory too and stays local-only:
+# it never enters any repository and no code here ever copies it elsewhere.
 
 def cfg_dir():
-    d = os.path.expanduser("~/.config/mail-cli")
-    os.makedirs(d, exist_ok=True)
+    d = str(home.state_dir())
+    os.makedirs(d, mode=0o700, exist_ok=True)
     return d
 def cfg_path(p): return os.path.join(cfg_dir(), f"{p}.json")
 def load_tok(p):
@@ -21,7 +30,7 @@ def save_tok(p, t): json.dump(t, open(cfg_path(p), "w"))
 def gcp_creds():
     f = os.path.join(cfg_dir(), "gcp.json")
     try: return json.load(open(f))
-    except Exception: fail("missing ~/.config/mail-cli/gcp.json (GCP OAuth client, human-provided, never in any repo)")
+    except Exception: fail(f"missing {f} (GCP OAuth client — human-provided, local-only, never in any repo)")
 
 # ---------- output ----------
 
